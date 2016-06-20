@@ -25,6 +25,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include "Basics.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 

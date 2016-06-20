@@ -310,6 +310,152 @@ $(CNTKMATH_LIB): $(MATH_OBJ)
 	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBPATH) $(NVMLPATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ $(LIBS) -fopenmp
 
 ########################################
+# CNTKLibrary
+########################################
+
+CNTK_COMMON_SRC =\
+	$(SOURCEDIR)/Common/BestGpu.cpp \
+	$(SOURCEDIR)/Common/MPIWrapper.cpp \
+
+COMPUTATION_NETWORK_LIB_SRC =\
+	$(SOURCEDIR)/ComputationNetworkLib/ComputationNode.cpp \
+	$(SOURCEDIR)/ComputationNetworkLib/ComputationNodeScripting.cpp \
+	$(SOURCEDIR)/ComputationNetworkLib/InputAndParamNodes.cpp \
+	$(SOURCEDIR)/ComputationNetworkLib/ReshapingNodes.cpp \
+	$(SOURCEDIR)/ComputationNetworkLib/SpecialPurposeNodes.cpp \
+	$(SOURCEDIR)/ComputationNetworkLib/ComputationNetwork.cpp \
+	$(SOURCEDIR)/ComputationNetworkLib/ComputationNetworkEvaluation.cpp \
+	$(SOURCEDIR)/ComputationNetworkLib/ComputationNetworkAnalysis.cpp \
+	$(SOURCEDIR)/ComputationNetworkLib/ComputationNetworkEditing.cpp \
+	$(SOURCEDIR)/ComputationNetworkLib/ComputationNetworkBuilder.cpp \
+	$(SOURCEDIR)/ComputationNetworkLib/ComputationNetworkScripting.cpp \
+
+SEQUENCE_TRAINING_LIB_SRC =\
+	$(SOURCEDIR)/SequenceTrainingLib/latticeforwardbackward.cpp \
+	$(SOURCEDIR)/SequenceTrainingLib/parallelforwardbackward.cpp \
+
+ifdef CUDA_PATH
+SEQUENCE_TRAINING_LIB_SRC +=\
+	$(SOURCEDIR)/Math/cudalatticeops.cu \
+	$(SOURCEDIR)/Math/cudalattice.cpp \
+	$(SOURCEDIR)/Math/cudalib.cpp \
+
+else
+SEQUENCE_TRAINING_LIB_SRC +=\
+	$(SOURCEDIR)/SequenceTrainingLib/latticeNoGPU.cpp \
+
+endif
+
+# CNTKLIBRARY_SRC =\
+#	$(SOURCEDIR)/CNTKv2LibraryDll/Common.cpp \
+#	$(SOURCEDIR)/CNTKv2LibraryDll/Function.cpp \
+#	$(SOURCEDIR)/CNTKv2LibraryDll/NDArrayView.cpp \
+#	$(SOURCEDIR)/CNTKv2LibraryDll/NDMask.cpp \
+#	$(SOURCEDIR)/CNTKv2LibraryDll/Utils.cpp \
+#	$(SOURCEDIR)/CNTKv2LibraryDll/Value.cpp \
+#	$(SOURCEDIR)/CNTKv2LibraryDll/Variable.cpp \
+#
+# CNTKLIBRARY_SRC+=$(CNTK_COMMON_SRC)
+# CNTKLIBRARY_SRC+=$(COMPUTATION_NETWORK_LIB_SRC)
+# CNTKLIBRARY_SRC+=$(SEQUENCE_TRAINING_LIB_SRC)
+#
+# CNTKLIBRARY_VERSION=2.0
+# CNTKLIBRARY:=cntklibrary-$(CNTKLIBRARY_VERSION)
+#
+# CNTKLIBRARY_OBJ := $(patsubst %.cu, $(OBJDIR)/%.o, $(patsubst %.cpp, $(OBJDIR)/%.o, $(CNTKLIBRARY_SRC)))
+#
+# CNTKLIBRARY_LIB:=$(LIBDIR)/lib$(CNTKLIBRARY).so
+# ALL+=$(CNTKLIBRARY_LIB)
+# SRC+=$(CNTKLIBRARY_SRC)
+#
+# RPATH=-Wl,-rpath,
+#
+# $(CNTKLIBRARY_LIB): $(CNTKLIBRARY_OBJ) | $(CNTKMATH_LIB)
+#	@echo $(SEPARATOR)
+#	@mkdir -p $(dir $@)
+#	@echo building output for $(ARCH) with build type $(BUILDTYPE)
+#	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(NVMLPATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ $(LIBS) -l$(CNTKMATH)
+#
+# ########################################
+# # CNTKLibrary tests
+# ########################################
+#
+# CNTKLIBRARY_TESTS_SRC =\
+#	Tests/UnitTests/V2LibraryTests/FeedForwardTests.cpp \
+#	Tests/UnitTests/V2LibraryTests/Main.cpp \
+#	Tests/UnitTests/V2LibraryTests/NDArrayViewTests.cpp \
+#	Tests/UnitTests/V2LibraryTests/RecurrentFunctionTests.cpp \
+#	Tests/UnitTests/V2LibraryTests/TensorTests.cpp \
+#
+# CNTKLIBRARY_TESTS:=$(BINDIR)/v2librarytests
+# CNTKLIBRARY_TESTS_OBJ := $(patsubst %.cu, $(OBJDIR)/%.o, $(patsubst %.cpp, $(OBJDIR)/%.o, $(CNTKLIBRARY_TESTS_SRC)))
+#
+# ALL+=$(CNTKLIBRARY_TESTS)
+# SRC+=$(CNTKLIBRARY_TESTS_SRC)
+#
+# RPATH=-Wl,-rpath,
+#
+# $(CNTKLIBRARY_TESTS): $(CNTKLIBRARY_TESTS_OBJ) | $(CNTKLIBRARY_LIB)
+#	@echo $(SEPARATOR)
+#	@mkdir -p $(dir $@)
+#	@echo building output for $(ARCH) with build type $(BUILDTYPE)
+#	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(NVMLPATH)) $(patsubst %,$(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH)) -o $@ $^ $(LIBS) -l$(CNTKLIBRARY) -l$(CNTKMATH)
+
+########################################
+# LibEval
+########################################
+
+EVALLIB_SRC =\
+	$(SOURCEDIR)/EvalDll/CNTKEval.cpp \
+	$(SOURCEDIR)/CNTK/BrainScript/BrainScriptEvaluator.cpp \
+	$(SOURCEDIR)/CNTK/BrainScript/BrainScriptParser.cpp \
+	$(SOURCEDIR)/CNTK/ModelEditLanguage.cpp \
+	$(SOURCEDIR)/SGDLib/Profiler.cpp \
+	$(SOURCEDIR)/SGDLib/SGD.cpp \
+	$(SOURCEDIR)/ActionsLib/EvalActions.cpp \
+	$(SOURCEDIR)/ActionsLib/NetworkFactory.cpp \
+	$(SOURCEDIR)/ActionsLib/NetworkDescriptionLanguage.cpp \
+	$(SOURCEDIR)/ActionsLib/SimpleNetworkBuilder.cpp \
+	$(SOURCEDIR)/ActionsLib/NDLNetworkBuilder.cpp
+
+EVALLIB_SRC+=$(COMPUTATION_NETWORK_LIB_SRC)
+EVALLIB_SRC+=$(CNTK_COMMON_SRC)
+EVALLIB_SRC+=$(SEQUENCE_TRAINING_LIB_SRC)
+
+EVALLIB_OBJ := $(patsubst %.cu, $(OBJDIR)/%.o, $(patsubst %.cpp, $(OBJDIR)/%.o, $(EVALLIB_SRC)))
+
+EVALLIB_NAME := eval
+EVALLIB := $(LIBDIR)/libeval.so
+ALL+=$(EVALLIB)
+SRC+=$(EVALLIB_SRC)
+
+$(EVALLIB): $(EVALLIB_OBJ) | $(CNTKMATH_LIB)
+	@echo $(SEPARATOR)
+	@mkdir -p $(dir $@)
+	@echo Building $(EVALLIB) for $(ARCH) with build type $(BUILDTYPE)
+	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(NVMLPATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ $(LIBS)
+
+# ########################################
+# # Eval Sample client
+# ########################################
+# EVAL_SAMPLE_CLIENT_SRC =\
+# 	$(SOURCEDIR)/../Examples/Evaluation/CPPEvalClient/CPPEvalClient.cpp
+#
+# EVAL_SAMPLE_CLIENT:=$(BINDIR)/cppevalclient
+# EVAL_SAMPLE_CLIENT_OBJ := $(patsubst %.cpp, $(OBJDIR)/%.o, $(EVAL_SAMPLE_CLIENT_SRC))
+#
+# ALL+=$(EVAL_SAMPLE_CLIENT)
+# SRC+=$(EVAL_SAMPLE_CLIENT_SRC)
+#
+# RPATH=-Wl,-rpath,
+#
+# $(EVAL_SAMPLE_CLIENT): $(EVAL_SAMPLE_CLIENT_OBJ) | $(EVALLIB)
+# 	@echo $(SEPARATOR)
+# 	@mkdir -p $(dir $@)
+# 	@echo building $(EVAL_SAMPLE_CLIENT) for $(ARCH) with build type $(BUILDTYPE)
+# 	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR)) $(patsubst %,$(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH)) -o $@ $^  -l$(EVALLIB_NAME) -l$(CNTKMATH)
+
+########################################
 # BinaryReader plugin
 ########################################
 
