@@ -49,6 +49,110 @@ int bestGPUDummy = 42; // put something into this CPP, as to avoid a linker warn
 #include <memory>
 #include "CrossProcessMutex.h"
 
+
+#define STRINGIFY(function) #function
+
+#ifdef NVIDIA_ML_OPTIONAL
+
+// dynamic resolution
+#define NVML_DL(function, ...) if (!runNvmlDl(STRINGIFY(function) , ##__VA_ARGS__)) return
+
+#ifdef __WINDOWS__
+static HMODULE nvml_lib = 0;
+bool loadNvidiaMl()
+{
+    if (!nvml_lib) {
+        nvml_lib = LoadLibrary("libnvidia-ml.dll");
+        if (!nvml_lib)
+        {
+            DWORD errornum = GetLastError();
+            fprintf(stderr, "Unable to load libnvidia-ml.dll: %d\n", errornum);
+            nvml_lib = 0;
+        }
+    }
+
+    return nvml_lib != 0;
+}
+
+template <class... argTypes>
+static inline bool runNvmlDl(const char * functionName, argTypes... args) {
+    nvmlReturn_t (__stdcall* func)(argTypes...);
+    *(void **) (&func) = GetProcAddress(nvml_lib, functionName);
+    if (!func)
+    {
+        DWORD errornum = GetLastError();
+        fprintf(stderr, "Unable to load NVIDIA-ML function %s: %d\n", functionName, errornum);
+        return false;
+    }
+
+    nvmlReturn_t result = (*func)(args...);
+    if (NVML_SUCCESS != result)
+    {
+        fprintf(stderr, "Unable to run NVIDIA-ML function %s: error %d\n", functionName, result);
+        return false;
+    }
+
+    return true;
+}
+
+#elif defined(__UNIX__)
+#include <dlfcn.h>
+static void* nvml_lib = 0;
+bool loadNvidiaMl()
+{
+    if (!nvml_lib)
+    {
+        dlerror();
+        nvml_lib = dlopen("libnvidia-ml.so", RTLD_LOCAL | RTLD_LAZY);
+        const char *errstr = dlerror();
+        if (errstr || !nvml_lib) {
+            fprintf(stderr, "Unable to load libnvidia-ml.so: %s\n", errstr ? errstr : "unknown error");
+            nvml_lib = 0;
+        }
+    }
+
+    return nvml_lib != 0;
+}
+
+template <class... argTypes>
+static inline bool runNvmlDl(const char * functionName, argTypes... args)
+{
+    dlerror();
+    nvmlReturn_t (*func)(argTypes...);
+    *(void **) (&func) = dlsym(nvml_lib, functionName);
+    const char *errstr = dlerror();
+    if (errstr || !func)
+    {
+        fprintf(stderr, "Unable to load NVIDIA-ML function %s: '%s'\n", functionName, errstr ? errstr : "unknown error");
+        return false;
+    }
+
+    nvmlReturn_t result = (*func)(args...);
+    if (NVML_SUCCESS != result)
+    {
+        fprintf(stderr, "Unable to run NVIDIA-ML function %s: error %d\n", functionName, result);
+        return false;
+    }
+
+    return true;
+}
+#endif // __WINDOWS__
+
+#else // NVIDIA_ML_OPTIONAL
+// Not loading the NVIDIA-ML library dynamically, so it must be linked in.
+
+#define NVML_DL(function, ...) \
+    do { \
+        nvmlReturn_t result = function(__VA_ARGS__); \
+        if (NVML_SUCCESS != result) { \
+            fprintf(stderr, "Unable to run NVIDIA-ML function %s: error %d", STRINGIFY(function), result); \
+            return; \
+        } \
+    } while (0)
+
+#endif // NVIDIA_ML_OPTIONAL
+
+
 // ---------------------------------------------------------------------------
 // BestGpu class
 // ---------------------------------------------------------------------------
@@ -307,7 +411,7 @@ BestGpu::~BestGpu()
     if (m_nvmlData)
     {
         // TODO: Check for error code and throw if !std::uncaught_exception()
-        nvmlShutdown();
+        NVML_DL(nvmlShutdown);
     }
 }
 
@@ -318,13 +422,15 @@ void BestGpu::GetNvmlData()
     if (m_nvmlData || !m_cudaData)
         return;
 
+#ifdef NVIDIA_ML_OPTIONAL
     // First initialize NVML library
-    nvmlReturn_t result = nvmlInit();
-    if (NVML_SUCCESS != result)
+    if !loadNvidiaMl())
     {
         return;
     }
+#endif // NVIDIA_ML_OPTIONAL
 
+    NVML_DL(nvmlInit);
     QueryNvmlData();
 }
 
@@ -542,15 +648,11 @@ void BestGpu::QueryNvmlData()
         nvmlUtilization_t utilization;
 
         // Query for device handle to perform operations on a device
-        nvmlReturn_t result = nvmlDeviceGetHandleByIndex(i, &device);
-        if (NVML_SUCCESS != result)
-            return; // failed: just back out
+        NVML_DL(nvmlDeviceGetHandleByIndex, i, &device);
 
         // pci.busId is very useful to know which device physically you're talking to
         // Using PCI identifier you can also match nvmlDevice handle to CUDA device.
-        result = nvmlDeviceGetPciInfo(device, &pci);
-        if (NVML_SUCCESS != result)
-            return;
+        NVML_DL(nvmlDeviceGetPciInfo, device, &pci);
 
         ProcessorData* curPd = NULL;
         for (ProcessorData* pd : m_procData)
@@ -566,15 +668,11 @@ void BestGpu::QueryNvmlData()
             continue;
 
         // Get the memory usage, will only work for TCC drivers
-        result = nvmlDeviceGetMemoryInfo(device, &memory);
-        if (NVML_SUCCESS != result)
-            return;
+        NVML_DL(nvmlDeviceGetMemoryInfo, device, &memory);
         curPd->memory = memory;
 
         // Get the memory usage, will only work for TCC drivers
-        result = nvmlDeviceGetUtilizationRates(device, &utilization);
-        if (NVML_SUCCESS != result)
-            return;
+        NVML_DL(nvmlDeviceGetUtilizationRates, device, &utilization);
         if (m_queryCount)
         {
             // average, slightly overweighting the most recent query
@@ -588,23 +686,21 @@ void BestGpu::QueryNvmlData()
         m_queryCount++;
 
         unsigned int size = 0;
-        result = nvmlDeviceGetComputeRunningProcesses(device, &size, NULL);
+        NVML_DL(nvmlDeviceGetComputeRunningProcesses, device, &size, NULL);
         if (size > 0)
         {
             std::vector<nvmlProcessInfo_t> processInfo(size);
             processInfo.resize(size);
             for (nvmlProcessInfo_t info : processInfo)
                 info.usedGpuMemory = 0;
-            result = nvmlDeviceGetComputeRunningProcesses(device, &size, &processInfo[0]);
-            if (NVML_SUCCESS != result)
-                return;
+            NVML_DL(nvmlDeviceGetComputeRunningProcesses, device, &size, &processInfo[0]);
             bool cntkFound = false;
             for (nvmlProcessInfo_t info : processInfo)
             {
                 std::string name;
                 name.resize(256);
                 unsigned len = (unsigned) name.length();
-                nvmlSystemGetProcessName(info.pid, (char*) name.data(), len);
+                NVML_DL(nvmlSystemGetProcessName, info.pid, (char*) name.data(), len);
                 name.resize(strlen(name.c_str()));
                 size_t pos = name.find_last_of(PATH_DELIMITER);
                 if (pos != std::string::npos)
