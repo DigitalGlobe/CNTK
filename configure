@@ -53,7 +53,7 @@ cub_check=cub/cub.cuh
 
 have_cudnn=no
 cudnn_path=
-cudnn_check=cuda/include/cudnn.h
+cudnn_check=include/cudnn.h
 
 have_opencv=no
 opencv_path=
@@ -221,7 +221,7 @@ function show_help ()
     echo "  --with-build-top=directory build directory $(show_default $build_top)"
     echo "  --add directory add directory to library search path"
     echo "  --1bitsgd[=(yes|no)] use 1Bit SGD $(show_default ${default_use_1bitsgd})"
-    echo "  --cuda[=(yes|no)] use cuda GPU $(show_default $(default_use_cuda))"
+    echo "  --cuda[=(yes|static|no)] use cuda GPU $(show_default $(default_use_cuda))"
     echo "  --with-cuda[=directory] $(show_default $(find_cuda))"
     echo "  --with-cub[=directory] $(show_default $(find_cub))"
     echo "  --with-gdk-include[=directory] $(show_default $(find_gdk_include))"
@@ -294,7 +294,7 @@ do
             ;;
 
         --cuda*)
-            if test x$optarg = xyes || test x$optarg = xno
+            if test x$optarg = xyes || test x$optarg = xstatic || test x$optarg = xno
             then
                 enable_cuda=$optarg
             else
@@ -306,7 +306,10 @@ do
 
         --with-cuda*)
             have_cuda=yes
-            enable_cuda=yes
+            if ( test x$optarg = x || test x$optarg = xno )
+            then
+                enable_cuda=yes
+            fi
             if test x$optarg = x
             then
                 cuda_path=$(find_cuda)
@@ -464,14 +467,14 @@ do
             then
                 boost_path=$(find_boost)
                 if test x$boost_path = x
-                then 
+                then
                     echo "Cannot find Boost directory"
                     echo "Please specify a value for --with-boost"
                     exit 1
                 fi
             else
                 if test $(check_dir $optarg $boost_check) = yes
-                then 
+                then
                     boost_path=$optarg
                 else
                     echo "Invalid Boost directory $optarg"
@@ -585,7 +588,7 @@ then
 fi
 
 # If no cuda library specified, search for one
-if test x$enable_cuda = xyes && test x$cuda_path = x
+if ( test x$enable_cuda = xyes || test x$enable_cuda = xstatic ) && test x$cuda_path = x
 then
     cuda_path=$(find_cuda)
     if test x$cuda_path = x ; then
@@ -597,7 +600,7 @@ then
     fi
 fi
 
-if test $enable_cuda = yes && test x$gdk_include_path = x
+if ( test x$enable_cuda = xyes || test x$enable_cuda = xstatic ) && test x$gdk_include_path = x
 then
     gdk_include_path=$(find_gdk_include)
     if test x$gdk_include_path = x ; then
@@ -621,7 +624,7 @@ then
     fi
 fi
 
-if test $enable_cuda = yes && test x$cub_path = x
+if ( test x$enable_cuda = xyes || test x$enable_cuda = xstatic ) && test x$cub_path = x
 then
     cub_path=$(find_cub)
     if test x$cub_path = x ; then
@@ -634,7 +637,7 @@ then
     fi
 fi
 
-if test $enable_cuda = yes && test x$cudnn_path = x
+if ( test x$enable_cuda = xyes || test x$enable_cuda = xstatic ) && test x$cudnn_path = x
 then
     cudnn_path=$(find_cudnn)
     if test x$cudnn_path = x ; then
@@ -705,7 +708,14 @@ case $mathlib in
         echo OPENBLAS_PATH=$openblas_path >> $config
         ;;
 esac
-if test $enable_cuda = yes ; then
+if test x$enable_cuda = xstatic ; then
+    echo CUDA_STATIC=true >> $config
+    echo CUDA_PATH=$cuda_path >> $config
+    echo GDK_PATH=$gdk_path >> $config
+    echo CUB_PATH=$cub_path >> $config
+    echo CUDNN_PATH=$cudnn_path >> $config
+fi
+if test x$enable_cuda = xyes ; then
     echo CUDA_PATH=$cuda_path >> $config
     echo GDK_INCLUDE_PATH=$gdk_include_path >> $config
     echo GDK_NVML_LIB_PATH=$gdk_nvml_lib_path >> $config
