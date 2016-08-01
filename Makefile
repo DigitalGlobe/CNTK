@@ -108,13 +108,22 @@ ifdef CUDA_PATH
 # Set up CUDA includes and libraries
   INCLUDEPATH += $(CUDA_PATH)/include
   LIBPATH += $(CUDA_PATH)/lib64
-  LIBS += -lcublas -lcudart -lcuda -lcurand -lcusparse -lnvidia-ml
+  ifneq ("$(CUDA_STATIC)", "true")
+    LIBS += -lcublas -lcudart -lcuda -lcurand -lcusparse -lnvidia-ml
+  else
+    LIBS += -lcublas_static -lcudart_static -lcurand_static -lcusparse_static -lnvidia-ml -lculibos -ldl
+    COMMON_FLAGS +=-DNVIDIA_ML_OPTIONAL
+  endif
 
 # Set up cuDNN if needed
   ifdef CUDNN_PATH
     INCLUDEPATH += $(CUDNN_PATH)/cuda/include
     LIBPATH += $(CUDNN_PATH)/cuda/lib64
-    LIBS += -lcudnn
+    ifneq ("$(CUDA_STATIC)", "true")
+      LIBS += -lcudnn
+    else
+      LIBS += -lcudnn_static -lculibos
+    endif
     COMMON_FLAGS +=-DUSE_CUDNN
   endif
 else
