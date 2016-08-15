@@ -416,15 +416,16 @@ BestGpu::~BestGpu()
 }
 
 // GetNvmlData - Get data from the Nvidia Management Library
-void BestGpu::GetNvmlData()
-{
+void BestGpu::GetNvmlData() {
     // if we already did this, or we couldn't initialize the CUDA data, skip it
     if (m_nvmlData || !m_cudaData)
+    {
         return;
+    }
 
 #ifdef NVIDIA_ML_OPTIONAL
     // First initialize NVML library
-    if !loadNvidiaMl())
+    if (!loadNvidiaMl())
     {
         return;
     }
