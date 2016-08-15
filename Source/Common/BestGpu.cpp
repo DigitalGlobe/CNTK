@@ -58,17 +58,15 @@ int bestGPUDummy = 42; // put something into this CPP, as to avoid a linker warn
 #define NVML_DL(function, ...) if (!runNvmlDl(STRINGIFY(function) , ##__VA_ARGS__)) return
 
 #ifdef __WINDOWS__
-#include <dlfcn.h>
 static HMODULE nvml_lib = 0;
 bool loadNvidiaMl()
 {
     if (!nvml_lib) {
-        GetLastError();
         nvml_lib = LoadLibrary("libnvidia-ml.dll");
-        const char *errstr = GetLastError();
-        if (errstr || !nvml_lib)
+        if (!nvml_lib)
         {
-            fprintf(stderr, "Unable to load libnvidia-ml.dll: %s\n", errstr ? errstr : "unknown error");
+            DWORD errornum = GetLastError();
+            fprintf(stderr, "Unable to load libnvidia-ml.dll: %d\n", errornum);
             nvml_lib = 0;
         }
     }
@@ -78,13 +76,12 @@ bool loadNvidiaMl()
 
 template <class... argTypes>
 static inline bool runNvmlDl(const char * functionName, argTypes... args) {
-    GetLastError();
-    nvmlReturn_t (*func)(argTypes...);
+    nvmlReturn_t (__stdcall* func)(argTypes...);
     *(void **) (&func) = GetProcAddress(nvml_lib, functionName);
-    const char *errstr = GetLastError();
-    if (errstr || !func)
+    if (!func)
     {
-        fprintf(stderr, "Unable to run NVIDIA-ML function %s: '%s'\n", functionName, errstr ? errstr : "unknown error");
+        DWORD errornum = GetLastError();
+        fprintf(stderr, "Unable to load NVIDIA-ML function %s: %d\n", functionName, errornum);
         return false;
     }
 
@@ -126,7 +123,7 @@ static inline bool runNvmlDl(const char * functionName, argTypes... args)
     const char *errstr = dlerror();
     if (errstr || !func)
     {
-        fprintf(stderr, "Unable to run NVIDIA-ML function %s: '%s'\n", functionName, errstr ? errstr : "unknown error");
+        fprintf(stderr, "Unable to load NVIDIA-ML function %s: '%s'\n", functionName, errstr ? errstr : "unknown error");
         return false;
     }
 
