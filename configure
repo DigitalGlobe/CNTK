@@ -711,7 +711,8 @@ esac
 if test x$enable_cuda = xstatic ; then
     echo CUDA_STATIC=true >> $config
     echo CUDA_PATH=$cuda_path >> $config
-    echo GDK_PATH=$gdk_path >> $config
+    echo GDK_INCLUDE_PATH=$gdk_include_path >> $config
+    echo GDK_NVML_LIB_PATH=$gdk_nvml_lib_path >> $config
     echo CUB_PATH=$cub_path >> $config
     echo CUDNN_PATH=$cudnn_path >> $config
 fi
